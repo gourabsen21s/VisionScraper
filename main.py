@@ -41,7 +41,7 @@ async def main():
         headless=True,  # Set to True for headless mode (FASTER)
         browser_type="chromium", # Options: "chromium", "firefox", "webkit"
         user_data_dir=user_data_dir,
-        block_resources=True
+        block_resources=False
     )
     session = BrowserSession(profile)
     
