@@ -31,7 +31,7 @@
 
 1.  **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/browser-agent.git
+    git clone https://github.com/gourabsen21s/agentic-product-scraper.git
     cd browser-agent
     ```
 
