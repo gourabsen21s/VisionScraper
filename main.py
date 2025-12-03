@@ -1,11 +1,11 @@
 import asyncio
 import os
-from playwright.async_api import async_playwright
+import json
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 # Import our custom agent
-from src.agent import CodeAgent
+from src.agent import BrowserAgent
 
 # Load environment variables
 load_dotenv()
@@ -28,12 +28,25 @@ async def main():
         print("❌ Error: AZURE_OPENAI_API_KEY not found in .env file")
         return
 
-    async with async_playwright() as p:
-        # Launch Browser
-        # headless=False lets you watch the agent work!
-        browser = await p.chromium.launch(headless=False)
-        context = await browser.new_context()
-        page = await context.new_page()
+    # Initialize Browser Session
+    # Initialize Browser Session
+    from src.browser import BrowserSession, BrowserProfile
+
+    # Initialize Browser Session with persistence
+    # Use a persistent user_data_dir to save cookies and session data
+    user_data_dir = os.path.join(os.getcwd(), "browser_data")
+    os.makedirs(user_data_dir, exist_ok=True)
+    
+    profile = BrowserProfile(
+        headless=True,  # Set to True for headless mode (FASTER)
+        browser_type="chromium", # Options: "chromium", "firefox", "webkit"
+        user_data_dir=user_data_dir,
+        block_resources=True
+    )
+    session = BrowserSession(profile)
+    
+    try:
+        await session.start()
 
         # Define the Task
         target_url = "https://webscraper.io/test-sites/e-commerce/allinone"
@@ -45,11 +58,11 @@ async def main():
     Hint: The price is likely in the product container, not the link itself. 
     Use `get_element(index, level=2)` to get the full product card text.
     """
-        print(f"🚀 Starting Custom CodeAgent (Azure OpenAI)...")
+        print(f"🚀 Starting Custom BrowserAgent (Azure OpenAI)...")
         print(f"🎯 Task: {task}\n")
 
         # Initialize Agent
-        agent = CodeAgent(page, ScrapeResult)
+        agent = BrowserAgent(session, ScrapeResult, use_vision=True)
         
         # Run Agent
         result = await agent.run(task)
@@ -58,7 +71,7 @@ async def main():
         print("\n" + "="*50)
         print("🏁 FINAL RESULT")
         print("="*50)
-        import json
+        
         # Handle cases where result might be None or error
         if result:
             print(json.dumps(result, indent=2, default=str))
@@ -67,7 +80,8 @@ async def main():
         
         # Keep browser open for a moment to inspect
         await asyncio.sleep(5)
-        await browser.close()
+    finally:
+        await session.close()
 
 if __name__ == "__main__":
     try:
