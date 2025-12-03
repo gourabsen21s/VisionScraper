@@ -7,26 +7,26 @@ from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
 from pydantic import BaseModel
 
 from src.sanitizer import CodeSanitizer
-from src.dom import DomService
+from src.browser import BrowserSession
 from src.tools import Toolset
+from src.dom.serializer.service import DOMTreeSerializer
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class CodeAgent:
+class BrowserAgent:
     """
     The main agent class that orchestrates the browser automation.
     It manages the LLM conversation history, variable persistence, 
     and the execution loop.
     """
-    def __init__(self, page, schema: Type[BaseModel]):
-        self.page = page
+    def __init__(self, session: BrowserSession, schema: Type[BaseModel]):
+        self.session = session
         self.schema = schema
         
         # Initialize Components
-        self.dom = DomService(page)
-        self.tools = Toolset(page, self.dom)
+        self.tools = Toolset(session)
         
         # Initialize Azure LLM
         # Ensure the following are in your .env file:
@@ -65,6 +65,10 @@ class CodeAgent:
         - await navigate("url")
         - await click(index)  <-- CRITICAL: Use the [i_xxx] index from the DOM State.
         - await input_text(index, "text")
+        - await scroll(amount=None) <-- Scroll down (None) or by pixels.
+        - await switch_tab(tab_id)
+        - await send_keys("keys") <-- e.g. "Enter", "Tab"
+        - await get_element(index, level=0) <-- Returns dict with keys: 'tag_name', 'text_content', 'attributes', 'children_ids'. Use level=1, 2 etc. to get parent/grandparent text.
         - await evaluate("js_code", variables={{}}) 
         - await done(result_dict)
         
@@ -72,7 +76,7 @@ class CodeAgent:
         1. The DOM State provided below shows interactive elements with indices [i_xxx].
         2. Indices [i_xxx] are VALID ONLY FOR THE CURRENT STEP. They change after navigation/action.
         3. Write valid Python code. Variables you define (e.g. `products = []`) persist between steps.
-        4. Use `evaluate` for extracting text using standard JS if needed (e.g. document.querySelector).
+        4. Use `get_element(index)` to scrape data. If the text (e.g. price) is visually next to the link but not returned, try `get_element(index, level=2)` to get the container's text.
         5. DO NOT hallucinate element IDs. Only use what you see in the DOM State.
         """
         
@@ -84,11 +88,15 @@ class CodeAgent:
             
             # A. PERCEIVE: Get the DOM state via CDP
             try:
-                dom_text = await self.dom.get_state_text()
+                # Get serialized state from session
+                browser_state = await self.session.get_state()
+                dom_text = DOMTreeSerializer.tree_to_string(browser_state.dom_state._root)
+                logger.info(f"DOM Text Length: {len(dom_text)}")
+                logger.info(f"DOM Text Preview: {dom_text[:500]}")
             except Exception as e:
                 dom_text = f"Error reading DOM: {e}"
 
-            current_url = self.page.url
+            current_url = self.session.page.url
             
             # B. UPDATE: Construct the user message
             user_msg = f"""
