@@ -1,0 +1,41 @@
+[
+  {
+    "goal": "Search for 'playwright python' on the page",
+    "elements": [
+      {"id": "search-box", "bbox": [400,250,900,300], "text": "", "type": "input"},
+      {"id": "search-button", "bbox": [920,250,1000,300], "text": "Search", "type": "button"}
+    ],
+    "result": {
+      "action": "type",
+      "target": { "by": "id", "value": "search-box" },
+      "value": "playwright python",
+      "confidence": 0.95,
+      "reason": "Search box present; type query before clicking search."
+    }
+  },
+  {
+    "goal": "Open the first trending repo",
+    "elements": [
+      {"id": "repo-1", "bbox": [200,400,1000,460], "text": "Repo name", "type": "link"},
+      {"id": "repo-2", "bbox": [200,470,1000,530], "text": "Repo name 2", "type": "link"}
+    ],
+    "result": {
+      "action": "click",
+      "target": { "by": "id", "value": "repo-1" },
+      "value": null,
+      "confidence": 0.9,
+      "reason": "First repo link visible; click to open details."
+    }
+  },
+  {
+    "goal": "Navigate to example.com",
+    "elements": [],
+    "result": {
+      "action": "navigate",
+      "target": null,
+      "value": "https://example.com",
+      "confidence": 0.98,
+      "reason": "Goal explicitly requests navigation to URL."
+    }
+  }
+]
