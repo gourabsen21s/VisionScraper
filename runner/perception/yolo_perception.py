@@ -1,9 +1,18 @@
 import time
+import cv2
+import numpy as np
 from typing import List
 from ultralytics import YOLO
 from runner.logger import log
 from runner.perception.ui_element import UIElement
 from runner.config import YOLO_MODEL_PATH
+
+try:
+    import pytesseract
+    TESSERACT_AVAILABLE = True
+except ImportError:
+    TESSERACT_AVAILABLE = False
+    log("WARN", "tesseract_missing", "OCR not available - install tesseract for text extraction")
 
 class YOLOPerception:
     def __init__(self, model_path: str = None):
@@ -15,9 +24,49 @@ class YOLOPerception:
             log("ERROR", "yolo_init_failed", "Failed to load YOLO model", error=str(e))
             raise
 
+    def _extract_text_from_region(self, image_path: str, bbox: List[int]) -> str:
+        """Extract text from a specific region using OCR."""
+        if not TESSERACT_AVAILABLE:
+            return ""
+        
+        try:
+            # Load image
+            img = cv2.imread(image_path)
+            if img is None:
+                return ""
+            
+            # Extract region
+            x1, y1, x2, y2 = bbox
+            region = img[y1:y2, x1:x2]
+            
+            # Convert to grayscale for better OCR
+            gray = cv2.cvtColor(region, cv2.COLOR_BGR2GRAY)
+            
+            # Apply threshold for better text extraction
+            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            # Extract text
+            # Try different OCR configurations for better results
+            try:
+                # Try standard mode first
+                text = pytesseract.image_to_string(thresh, config='--psm 6').strip()
+                if not text:
+                    # Try single character mode
+                    text = pytesseract.image_to_string(thresh, config='--psm 7').strip()
+                if not text:
+                    # Try word mode
+                    text = pytesseract.image_to_string(thresh, config='--psm 8').strip()
+            except:
+                text = pytesseract.image_to_string(thresh).strip()
+            
+            return text
+        except Exception as e:
+            log("DEBUG", "ocr_failed", "OCR extraction failed", error=str(e))
+            return ""
+
     def analyze(self, screenshot_path: str) -> List[UIElement]:
         """
-        Run inference on the screenshot and return detected UI elements.
+        Run inference on the screenshot and return detected UI elements with OCR text.
         """
         start = time.time()
         log("INFO", "perception_yolo_start", "Analyzing screenshot with YOLO", screenshot_path=screenshot_path)
@@ -44,13 +93,16 @@ class YOLOPerception:
                     cls_id = int(box.cls[0])
                     cls_name = result.names[cls_id]
                     
-                    # Create UIElement
-                    # We might not have text content from YOLO, so we leave it empty or infer it later (e.g. via OCR)
-                    # For now, we just return the box and type.
+                    # Extract text using OCR for certain element types
+                    text = ""
+                    if cls_name in ['field', 'button', 'link'] and TESSERACT_AVAILABLE:
+                        text = self._extract_text_from_region(screenshot_path, [x1, y1, x2, y2])
+                    
+                    # Create UIElement with OCR text
                     element = UIElement(
                         id=f"yolo-{i}",
                         bbox=[x1, y1, x2, y2],
-                        text="", # YOLO doesn't give text
+                        text=text, # Now includes OCR text
                         type=cls_name,
                         metadata={"confidence": conf}
                     )
