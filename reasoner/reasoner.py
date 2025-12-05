@@ -44,26 +44,15 @@ def _build_system_prompt(goal: str, elements: List[Dict[str, Any]], last_actions
     return prompt
 
 def _get_llm():
-    try:
-        llm = AzureChatOpenAI(
-            azure_endpoint=rconfig.AZURE_OPENAI_BASE,
-            openai_api_key=rconfig.AZURE_OPENAI_KEY,
-            deployment_name=rconfig.AZURE_DEPLOYMENT,
-            api_version=getattr(rconfig, "AZURE_API_VERSION", "2023-10-01"),
-            max_tokens=512,
-            temperature=0.0  # deterministic
-        )
-        return llm
-    except Exception as e:
-        log("WARN", "reasoner_llm_init_failed", "Failed to init AzureChatOpenAI, using mock", error=str(e))
-        
-        class MockLLM:
-            def __call__(self, messages):
-                from langchain_core.messages import AIMessage
-                # Return a dummy JSON response
-                return AIMessage(content='{"action": "noop", "target": null, "value": null, "confidence": 1.0, "reason": "Mock LLM used due to missing credentials"}')
-        
-        return MockLLM()
+    llm = AzureChatOpenAI(
+        azure_endpoint=rconfig.AZURE_OPENAI_BASE,
+        openai_api_key=rconfig.AZURE_OPENAI_KEY,
+        deployment_name=rconfig.AZURE_DEPLOYMENT,
+        api_version=getattr(rconfig, "AZURE_API_VERSION", "2023-10-01"),
+        max_tokens=512,
+        temperature=0.0  # deterministic
+    )
+    return llm
 
 class Reasoner:
     def __init__(self, model=None):
