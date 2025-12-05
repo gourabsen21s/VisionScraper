@@ -1,4 +1,4 @@
-# 🤖 Agentic Product Scraper
+# 🤖 Browser Automation With Computer Vision
 
 <div align="center">
 
@@ -77,18 +77,20 @@ python scripts/run_agent.py "Go to youtube.com, search for 'lofi hip hop', and p
 
 ## 🔧 Configuration
 
-The agent is highly configurable via `runner/config.py` and environment variables.
+The agent is highly configurable via environment variables or `.env` file.
 
-### Browser Profile
-The new `BrowserProfile` system allows detailed customization:
-- **Headless Mode**: Toggle visibility (`HEADLESS=true/false`)
-- **Extensions**: Auto-loads ad-blockers and utility extensions.
-- **User Data**: Persists sessions via `user_data_dir`.
-- **Proxy**: Supports authenticated proxies for rotation.
-
-### Perception
-- **YOLO Model**: Configurable path to custom weights (`YOLO_MODEL_PATH`).
-- **Confidence Threshold**: Adjustable detection sensitivity.
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `BM_HEADLESS` | Run browser in headless mode | `false` |
+| `BM_BROWSER_EXEC_PATH` | Custom path to browser executable | `None` |
+| `BM_VIEWPORT_W` | Browser viewport width | `1440` |
+| `BM_VIEWPORT_H` | Browser viewport height | `900` |
+| `BM_LOG_LEVEL` | Logging verbosity (DEBUG, INFO, ERROR) | `INFO` |
+| `BM_YOLO_MODEL_PATH` | Path to YOLO detection model | `models/web_detect_best_m.pt` |
+| `BM_USER_DATA_DIR` | Directory for persistent user data | `~/.browser-runner/user_data` |
+| `AZURE_OPENAI_BASE` | Azure OpenAI Endpoint URL | Required |
+| `AZURE_OPENAI_KEY` | Azure OpenAI API Key | Required |
+| `AZURE_DEPLOYMENT` | Deployment name for GPT-4 | `gpt-4o` |
 
 ## 🏗️ Architecture
 
@@ -145,6 +147,9 @@ graph TD
 
 ## 📂 Project Structure
 
+<details>
+<summary>Click to expand file tree</summary>
+
 ```text
 browser-runner/
 ├── api/                        # FastAPI server for remote control
@@ -172,6 +177,39 @@ browser-runner/
 │   └── web_detect_best_m.pt    # Fine-tuned YOLO weights
 └── artifacts/                  # Session outputs (screenshots, videos, logs)
 ```
+</details>
+
+## 🗺️ Roadmap
+
+- [ ] **Multi-Tab Support**: Handle complex workflows involving multiple tabs.
+- [ ] **DOM Tree Integration**: Hybrid perception combining visual and DOM data.
+- [ ] **Self-Correction**: Automatic recovery from failed actions.
+- [ ] **Parallel Execution**: Run multiple agents concurrently.
+
+## ❓ Troubleshooting
+
+<details>
+<summary><b>Browser fails to launch</b></summary>
+
+- Ensure Playwright browsers are installed: `playwright install chromium`
+- Check `BM_BROWSER_EXEC_PATH` is correct if set.
+- Verify no other Chrome instances are locking the user data directory.
+</details>
+
+<details>
+<summary><b>LLM Validation Error</b></summary>
+
+- Ensure `AZURE_DEPLOYMENT` matches your Azure OpenAI deployment name.
+- Check logs for raw LLM output to debug prompt issues.
+</details>
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
