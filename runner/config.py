@@ -25,3 +25,9 @@ LOG_LEVEL = os.getenv("BM_LOG_LEVEL", "INFO")
 # Perception
 # YOLO_MODEL_PATH = os.getenv("BM_YOLO_MODEL_PATH", "OpenDILabCommunity/webpage_element_detection")
 YOLO_MODEL_PATH = os.getenv("BM_YOLO_MODEL_PATH", "models/web_detect_best_m.pt") # Use standard model for easy start
+
+# Browser Profile Config
+from pathlib import Path
+IN_DOCKER = os.getenv("IN_DOCKER", "false").lower() == "true"
+BROWSER_USE_EXTENSIONS_DIR = Path(os.getenv("BM_EXTENSIONS_DIR", os.path.expanduser("~/.browser-runner/extensions")))
+BROWSER_USE_DEFAULT_USER_DATA_DIR = Path(os.getenv("BM_USER_DATA_DIR", os.path.expanduser("~/.browser-runner/user_data")))

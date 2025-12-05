@@ -4,6 +4,7 @@ import traceback
 from typing import Optional
 from playwright.async_api import async_playwright, Playwright, Browser, BrowserContext
 from . import config, logger, errors, metrics
+from .browser_profile import BrowserProfile
 
 class BrowserManager:
     """
@@ -18,6 +19,14 @@ class BrowserManager:
         self._stop_event = asyncio.Event()
         self._restart_count = 0
         self._last_restart_ts = 0
+        
+        # Initialize BrowserProfile
+        self.profile = BrowserProfile(
+            headless=config.HEADLESS,
+            executable_path=config.BROWSER_EXEC_PATH,
+            user_data_dir=config.BROWSER_USE_DEFAULT_USER_DATA_DIR
+        )
+        
         # Start prometheus metrics server if requested
         try:
             metrics.start_metrics_server(config.PROMETHEUS_METRICS_PORT)
@@ -48,21 +57,31 @@ class BrowserManager:
     # -------------------------
     async def _start_browser(self):
         try:
+            launch_args = self.profile.get_args()
+            # Filter out args that are not allowed in launch() or handled separately
+            launch_args = [
+                arg for arg in launch_args 
+                if not arg.startswith('--user-data-dir=') 
+                and not arg.startswith('--profile-directory=')
+            ]
+            
             logger.log("INFO", "bm_launch", "Launching Playwright + Chromium",
-                       headless=config.HEADLESS, exec_path=config.BROWSER_EXEC_PATH)
+                       headless=self.profile.headless, 
+                       exec_path=self.profile.executable_path,
+                       args=launch_args)
+            
             self._playwright = await async_playwright().start()
-            launch_args = [] # Firefox doesn't need the same sandbox args usually, but we can keep empty or minimal
-            if config.BROWSER_EXEC_PATH:
-                self._browser = await self._playwright.chromium.launch(
-                    headless=config.HEADLESS,
-                    executable_path=config.BROWSER_EXEC_PATH,
-                    args=launch_args
-                )
-            else:
-                self._browser = await self._playwright.chromium.launch(
-                    headless=config.HEADLESS,
-                    args=launch_args
-                )
+            
+            self._browser = await self._playwright.chromium.launch(
+                headless=self.profile.headless,
+                executable_path=self.profile.executable_path,
+                args=launch_args,
+                downloads_path=self.profile.downloads_path,
+                traces_dir=self.profile.traces_dir,
+                chromium_sandbox=self.profile.chromium_sandbox,
+                devtools=self.profile.devtools,
+            )
+            
             self._restart_count = 0 if self._restart_count == 0 else self._restart_count
             metrics.BROWSER_UP.set(1)
             logger.log("INFO", "bm_launched", "Chromium launched")
@@ -100,12 +119,21 @@ class BrowserManager:
         """
         if not self._browser:
             raise errors.BrowserHealthError("Browser not started")
-        # merge default viewport etc
+            
+        # Use profile settings for context, but allow overrides from kwargs
         context_kwargs = {
-            "viewport": config.DEFAULT_VIEWPORT,
-            "ignore_https_errors": True,
+            "viewport": self.profile.viewport,
+            "user_agent": self.profile.user_agent,
+            "accept_downloads": self.profile.accept_downloads,
+            "ignore_https_errors": True, # Always ignore for automation
+            "java_script_enabled": True,
+            "bypass_csp": True,
             **kwargs
         }
+        
+        # Filter out None values to let Playwright defaults apply or to avoid errors
+        context_kwargs = {k: v for k, v in context_kwargs.items() if v is not None}
+
         try:
             ctx = await self._browser.new_context(**context_kwargs)
             logger.log("DEBUG", "bm_new_context", "Created new browser context")

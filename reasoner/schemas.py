@@ -1,5 +1,5 @@
 # reasoner/schemas.py
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator
 from typing import Literal, Optional, Dict, Any
 
 class Target(BaseModel):
@@ -13,11 +13,11 @@ class ActionSchema(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0)
     reason: str
 
-    @validator("target", always=True)
-    def validate_target_for_action(cls, v, values):
-        act = values.get("action")
-        if act in ("click", "type", "hover", "press_key") and v is None:
+    @model_validator(mode='after')
+    def validate_action_requirements(self):
+        act = self.action
+        if act in ("click", "type", "hover", "press_key") and self.target is None:
             raise ValueError(f"action '{act}' requires a target")
-        if act == "navigate" and (values.get("value") is None or values.get("value") == ""):
+        if act == "navigate" and (self.value is None or self.value == ""):
             raise ValueError("navigate action requires 'value' (url)")
-        return v
+        return self
