@@ -24,7 +24,12 @@ with open(FEW_SHOT_PATH, "r", encoding="utf-8") as f:
 # Minimal expected config object:
 # AZURE_OPENAI_BASE, AZURE_OPENAI_KEY, AZURE_DEPLOYMENT, AZURE_API_VERSION
 
-def _build_system_prompt(goal: str, elements: List[Dict[str, Any]], last_actions: Optional[List[Dict]] = None) -> str:
+def _build_system_prompt(
+    goal: str, 
+    elements: List[Dict[str, Any]], 
+    last_actions: Optional[List[Dict]] = None,
+    page_context: Optional[Dict[str, Any]] = None
+) -> str:
     # Build the prompt string with few-shot examples + current context
     examples = []
     for ex in FEW_SHOT_EXAMPLES:
@@ -38,8 +43,20 @@ def _build_system_prompt(goal: str, elements: List[Dict[str, Any]], last_actions
     # Add examples
     prompt += "Few-shot examples (do not output these as answer):\n"
     prompt += json.dumps(examples, indent=2)
+    
+    # Build current context with page info
+    context = {
+        "goal": goal, 
+        "elements": elements, 
+        "last_actions": last_actions or []
+    }
+    
+    # Add page context if available (URL, element changes, etc.)
+    if page_context:
+        context["page_info"] = page_context
+    
     prompt += "\n\nCurrent context:\n"
-    prompt += json.dumps({"goal": goal, "elements": elements, "last_actions": last_actions or []}, indent=2)
+    prompt += json.dumps(context, indent=2)
     prompt += "\n\nReturn the single JSON action now."
     return prompt
 
@@ -58,12 +75,24 @@ class Reasoner:
     def __init__(self, model=None):
         self.llm = model or _get_llm()
 
-    def plan_one(self, goal: str, elements: List[Dict[str, Any]], last_actions: Optional[List[Dict]] = None) -> ActionSchema:
+    def plan_one(
+        self, 
+        goal: str, 
+        elements: List[Dict[str, Any]], 
+        last_actions: Optional[List[Dict]] = None,
+        page_context: Optional[Dict[str, Any]] = None
+    ) -> ActionSchema:
         """
         Returns a validated ActionSchema object representing the next action.
         Raises ValueError if unable to produce valid action.
+        
+        :param page_context: Optional dict with keys like:
+            - current_url: str - Current page URL
+            - prev_element_count: int - Number of elements in previous step
+            - element_count_change: int - Change in element count
+            - page_title: str - Current page title
         """
-        prompt = _build_system_prompt(goal, elements, last_actions)
+        prompt = _build_system_prompt(goal, elements, last_actions, page_context)
         # Ask LLM
         log("INFO", "reasoner_request", "Sending prompt to LLM", goal=goal, elements_count=len(elements))
         start = time.time()

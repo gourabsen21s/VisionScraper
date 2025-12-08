@@ -119,8 +119,8 @@ class ActionExecutor:
         self._log_failure(aid, "click_selector", payload, str(last_exc), attempt=attempts)
         raise ActionExecutionError(f"click_selector failed: {last_exc}")
 
-    # Click at absolute coordinates (x,y)
-    async def click_xy(self, x: int, y: int, attempts: int = DEFAULT_RETRY_ATTEMPTS) -> Dict[str, Any]:
+    # Click at absolute coordinates (x,y) with new tab detection
+    async def click_xy(self, x: int, y: int, attempts: int = DEFAULT_RETRY_ATTEMPTS, handle_new_tab: bool = True) -> Dict[str, Any]:
         aid = self._new_action_id()
         payload = {"action": "click_xy", "x": x, "y": y}
         self._log_start(aid, "click_xy", payload)
@@ -134,12 +134,34 @@ class ActionExecutor:
                     await asyncio.sleep(0.5 * (2 ** attempt))
 
                 await self._ensure_page()
+                
+                # Get context to detect new tabs
+                context = self.page.context
+                pages_before = len(context.pages)
+                
                 await self.page.mouse.move(x, y)
                 await self.page.mouse.click(x, y)
                 
+                # Wait a bit for potential new tab to open
+                if handle_new_tab:
+                    await asyncio.sleep(0.5)
+                    pages_after = context.pages
+                    
+                    # If a new tab was opened, switch to it
+                    if len(pages_after) > pages_before:
+                        new_page = pages_after[-1]  # Get the newest page
+                        log("INFO", "new_tab_detected", "New tab opened, switching to it", 
+                            session_id=self.session_id, new_url=new_page.url[:80])
+                        self.page = new_page
+                        # Wait for the new page to load
+                        try:
+                            await new_page.wait_for_load_state("domcontentloaded", timeout=5000)
+                        except:
+                            pass  # Continue even if timeout
+                
                 duration = time.time() - start
                 self._log_success(aid, "click_xy", payload, duration)
-                return {"action_id": aid, "status": "success", "duration": duration}
+                return {"action_id": aid, "status": "success", "duration": duration, "new_tab": len(context.pages) > pages_before}
             except Exception as e:
                 last_exc = e
 

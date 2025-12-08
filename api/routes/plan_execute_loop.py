@@ -11,6 +11,7 @@ from reasoner.schemas import ActionSchema
 from runner.logger import log
 import os
 import time
+import asyncio
 import traceback
 
 router = APIRouter()
@@ -18,8 +19,9 @@ _perception = YOLOPerception()
 _reasoner = Reasoner()
 
 # Config defaults (override with env vars)
-DEFAULT_MAX_STEPS = int(os.getenv("PLAN_LOOP_MAX_STEPS", "8"))
-CONFIDENCE_THRESHOLD = float(os.getenv("REASONER_CONFIDENCE_THRESHOLD", "0.4"))
+DEFAULT_MAX_STEPS = int(os.getenv("PLAN_LOOP_MAX_STEPS", "25"))  # Increased from 8 for complex tasks
+CONFIDENCE_THRESHOLD = float(os.getenv("REASONER_CONFIDENCE_THRESHOLD", "0.35"))  # Slightly lowered
+POST_ACTION_WAIT_SEC = float(os.getenv("POST_ACTION_WAIT_SEC", "2.0"))  # Wait after page-changing actions
 
 class PlanLoopRequest(BaseModel):
     goal: str
@@ -130,9 +132,36 @@ async def plan_execute_loop(session_id: str, body: PlanLoopRequest, sm: SessionM
             elements = _perception.analyze(screenshot_path)
             elements_list = [e.dict() for e in elements]
 
-            # 3) reasoning
+            # 3) Get page context for better reasoning
+            page = meta.page
+            current_url = page.url if page else ""
             try:
-                action_schema: ActionSchema = _reasoner.plan_one(body.goal, elements_list, last_actions=meta.metadata.get("executed_actions", []))
+                page_title = await page.title() if page else ""
+            except:
+                page_title = ""
+            
+            prev_element_count = meta.metadata.get("prev_element_count", 0)
+            element_count_change = len(elements_list) - prev_element_count
+            meta.metadata["prev_element_count"] = len(elements_list)
+            
+            page_context = {
+                "current_url": current_url,
+                "page_title": page_title,
+                "element_count": len(elements_list),
+                "prev_element_count": prev_element_count,
+                "element_count_change": element_count_change,
+                "step_number": step
+            }
+            log("DEBUG", "plan_loop_page_context", "Page context", session_id=session_id, url=current_url[:80], element_change=element_count_change)
+            
+            # 4) reasoning with page context
+            try:
+                action_schema: ActionSchema = _reasoner.plan_one(
+                    body.goal, 
+                    elements_list, 
+                    last_actions=meta.metadata.get("executed_actions", []),
+                    page_context=page_context
+                )
             except Exception as re:
                 # if reasoner fails outright, stop loop
                 log("ERROR", "plan_loop_reasoner_error", "Reasoner failed mid-loop", session_id=session_id, step=step, error=str(re))
@@ -141,8 +170,16 @@ async def plan_execute_loop(session_id: str, body: PlanLoopRequest, sm: SessionM
             action_dict = action_schema.dict()
             log("DEBUG", "plan_loop_reasoned", "Step reasoned action", step=step, action=action_dict)
 
-            # 4) termination condition: noop => done
+            # 4) termination condition: noop => done (but prevent premature noop)
             if action_schema.action == "noop":
+                executed_count = len([s for s in steps if s.executed])
+                if executed_count < 3:
+                    # Premature noop - skip and continue
+                    log("WARN", "plan_loop_premature_noop", "Noop returned too early, continuing", 
+                        session_id=session_id, step=step, executed_count=executed_count, reason=action_schema.reason)
+                    await asyncio.sleep(2)  # Wait for page to potentially change
+                    continue
+                
                 log("INFO", "plan_loop_noop", "Reasoner returned noop — stopping loop", session_id=session_id, step=step, reason=action_schema.reason)
                 steps.append(StepResult(step=step, action=action_dict, executed=False, execution_result=None, reasoner_raw=action_dict))
                 completed = True
@@ -209,6 +246,16 @@ async def plan_execute_loop(session_id: str, body: PlanLoopRequest, sm: SessionM
 
                 steps.append(StepResult(step=step, action=action_dict, executed=True, execution_result=exec_result, reasoner_raw=action_dict))
                 log("INFO", "plan_loop_step_success", "Step executed", session_id=session_id, step=step, exec_result=exec_result)
+
+                # 9) Wait after page-changing actions to allow page to stabilize
+                if a in ("click", "navigate", "press_key", "type"):
+                    log("DEBUG", "plan_loop_wait", f"Waiting {POST_ACTION_WAIT_SEC}s for page to stabilize", session_id=session_id)
+                    await asyncio.sleep(POST_ACTION_WAIT_SEC)
+                    # Try to wait for network idle (non-blocking)
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=3000)
+                    except Exception:
+                        pass  # Continue even if timeout
 
             except Exception as exec_e:
                 log("ERROR", "plan_loop_step_failed", "Execution error", session_id=session_id, step=step, error=str(exec_e), tb=traceback.format_exc())

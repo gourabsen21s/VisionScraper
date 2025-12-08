@@ -1,0 +1,25 @@
+[project]
+name = "agentic-browser-vision"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.1.2",
+    "langchain-community>=0.4.1",
+    "langchain-core>=1.1.1",
+    "langchain-openai>=1.1.0",
+    "numpy>=2.3.5",
+    "opencv-python-headless>=4.11.0.86",
+    "paddleocr>=3.3.2",
+    "paddlepaddle>=3.2.2",
+    "pillow>=12.0.0",
+    "playwright>=1.56.0",
+    "prometheus-client>=0.23.1",
+    "pydantic>=2.12.5",
+    "pytesseract>=0.3.13",
+    "pytest>=9.0.1",
+    "python-dotenv>=1.2.1",
+    "tqdm>=4.67.1",
+    "ultralytics>=8.3.235",
+]
