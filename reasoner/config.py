@@ -1,5 +1,8 @@
 # reasoner/config.py
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 AZURE_OPENAI_BASE = os.getenv("AZURE_OPENAI_BASE", "https://your-openai-endpoint.openai.azure.com/")
 AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "")

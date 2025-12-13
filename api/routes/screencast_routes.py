@@ -17,8 +17,7 @@ async def screencast_websocket(websocket: WebSocket, session_id: str):
     await websocket.accept()
     log("INFO", "screencast_connect", "Screencast WebSocket connected", session_id=session_id)
     
-    from api.deps import _session_manager
-    sm = _session_manager
+    sm = get_session_manager()
     
     if not sm:
         await websocket.close(code=1011, reason="Session manager not initialized")

@@ -180,6 +180,8 @@ const GlassSurface: React.FC<GlassSurfaceProps> = ({
   }, [width, height]);
 
   const supportsSVGFilters = () => {
+    if (typeof window === 'undefined') return false;
+
     const isWebkit = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
     const isFirefox = /Firefox/.test(navigator.userAgent);
 
@@ -197,6 +199,14 @@ const GlassSurface: React.FC<GlassSurfaceProps> = ({
     return CSS.supports('backdrop-filter', 'blur(10px)');
   };
 
+  const [isSVGSupported, setIsSVGSupported] = useState(false);
+  const [isBackdropSupported, setIsBackdropSupported] = useState(false);
+
+  useEffect(() => {
+    setIsSVGSupported(supportsSVGFilters());
+    setIsBackdropSupported(supportsBackdropFilter());
+  }, []);
+
   const getContainerStyles = (): React.CSSProperties => {
     const baseStyles: React.CSSProperties = {
       width: typeof width === 'number' ? `${width}px` : width,
@@ -206,8 +216,9 @@ const GlassSurface: React.FC<GlassSurfaceProps> = ({
       '--glass-saturation': saturation
     } as React.CSSProperties;
 
-    const svgSupported = supportsSVGFilters();
-    const backdropFilterSupported = supportsBackdropFilter();
+    // Use state values instead of calling functions directly during render
+    const svgSupported = isSVGSupported;
+    const backdropFilterSupported = isBackdropSupported;
 
     if (svgSupported) {
       return {

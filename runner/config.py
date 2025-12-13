@@ -1,5 +1,8 @@
 # browser_manager/config.py
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Playwright / browser config
 HEADLESS = os.getenv("BM_HEADLESS", "false").lower() == "true"
