@@ -11,6 +11,7 @@ from .logger import log
 from .errors import BrowserHealthError
 from .paths import make_session_dir, session_screenshot_path, session_video_path
 from .config import DEFAULT_VIEWPORT
+from .screenshot_service import ScreenshotService
 
 @dataclass
 class SessionMeta:
@@ -35,6 +36,7 @@ class SessionManager:
         self._sessions: Dict[str, SessionMeta] = {}
         self._lock = asyncio.Lock()
         self._artifacts_root = artifacts_root or os.getenv("BM_ARTIFACTS_ROOT", "/tmp/browser_runner_artifacts")
+        self._screenshot_service = ScreenshotService()
         os.makedirs(self._artifacts_root, exist_ok=True)
 
     # ---------------------
@@ -117,9 +119,12 @@ class SessionManager:
             meta = self._sessions.get(session_id)
             if not meta or meta.status != "active":
                 raise KeyError(f"Active session {session_id} not found")
+            
+            # Ensure path uses .jpg if that's what we want, but filename comes from caller
             path = session_screenshot_path(meta.session_dir, filename)
             try:
-                await meta.page.screenshot(path=path)
+                # Use service to capture optimized screenshot
+                await self._screenshot_service.capture_to_file(meta.page, path)
                 meta.last_update = time.time()
                 log("INFO", "session_snapshot", "Saved screenshot", session_id=session_id, path=path)
                 return path
