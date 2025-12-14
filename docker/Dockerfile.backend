@@ -44,6 +44,7 @@ ENV BM_VIEWPORT_W=1440
 ENV BM_VIEWPORT_H=900
 ENV PYTHONUNBUFFERED=1
 ENV BM_ARTIFACTS_ROOT=/tmp/artifacts
+ENV IN_DOCKER=true
 
 # Create artifacts directory
 RUN mkdir -p /tmp/artifacts
