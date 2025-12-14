@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 // Runtime backend URL - read from environment at runtime, not build time
 const getBackendUrl = () => {
-  return process.env.BACKEND_URL || 'http://localhost:8000';
+  return process.env.BACKEND_URL || 'https://visionscraper-backend.internal.whitepebble-a73ac1ee.southindia.azurecontainerapps.io';
 };
 
 async function proxyRequest(request: NextRequest, params: { path: string[] }) {
