@@ -125,7 +125,7 @@ async def plan_execute_loop(session_id: str, body: PlanLoopRequest, sm: SessionM
     try:
         for step in range(1, (body.max_steps or DEFAULT_MAX_STEPS) + 1):
             # 1) snapshot
-            screenshot_name = f"loop_{int(time.time())}.png"
+            screenshot_name = f"loop_{int(time.time())}.jpg"
             screenshot_path = await sm.snapshot(session_id, screenshot_name)
 
             # 2) perception
