@@ -7,7 +7,13 @@ _sm = None
 async def init_services(app):
     global _bm, _sm
     _bm = BrowserManager()
-    await _bm.start()
+    try:
+        await _bm.start()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"CRITICAL WARNING: BrowserManager failed to start: {e}. Application will start without browser capabilities.")
+
     _sm = SessionManager(_bm)
     
     @app.on_event("shutdown")
