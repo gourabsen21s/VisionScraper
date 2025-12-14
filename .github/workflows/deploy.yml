@@ -68,7 +68,7 @@ jobs:
           BM_VIEWPORT_W=1440
           BM_VIEWPORT_H=900
         targetPort: 8000
-        ingress: internal
+        ingress: external
     
     - name: Get Backend FQDN
       id: backend-fqdn
