@@ -1,3 +1,5 @@
+fastapi>=0.115.0
+uvicorn>=0.30.0
 playwright
 prometheus_client
 ultralytics
@@ -14,3 +16,5 @@ langchain-community
 langchain-core
 langchain-openai
 python-dotenv
+azure-storage-blob
+websockets

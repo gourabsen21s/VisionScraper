@@ -1,14 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  rewrites: async () => {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*',
-      },
-    ]
-  },
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+  
+  // Disable source maps in production for smaller bundle size
+  productionBrowserSourceMaps: false,
 };
 
 export default nextConfig;

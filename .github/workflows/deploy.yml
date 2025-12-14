@@ -1,0 +1,103 @@
+name: Build and Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+env:
+  RESOURCE_GROUP: rg-visionscraper-prod
+  ACA_ENV: visionscraper-env
+  BACKEND_APP_NAME: visionscraper-backend
+  FRONTEND_APP_NAME: visionscraper-frontend
+  ACR_NAME: visionscaperacr
+  LOCATION: southindia
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Login to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+    
+    - name: Login to ACR
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+    
+    - name: Build and push backend image
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }} \
+          -t ${{ secrets.ACR_LOGIN_SERVER }}/backend:latest \
+          -f docker/Dockerfile.backend .
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/backend:latest
+    
+    - name: Build and push frontend image
+      run: |
+        docker build -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }} \
+          -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest \
+          -f docker/Dockerfile.frontend .
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }}
+        docker push ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest
+    
+    - name: Deploy Backend to Container Apps
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        resourceGroup: ${{ env.RESOURCE_GROUP }}
+        containerAppName: ${{ env.BACKEND_APP_NAME }}
+        containerAppEnvironment: ${{ env.ACA_ENV }}
+        imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/backend:${{ github.sha }}
+        environmentVariables: |
+          AZURE_OPENAI_KEY=secretref:azure-openai-key
+          AZURE_OPENAI_BASE=${{ secrets.AZURE_OPENAI_BASE }}
+          AZURE_DEPLOYMENT=${{ secrets.AZURE_DEPLOYMENT }}
+          AZURE_API_VERSION=${{ secrets.AZURE_API_VERSION }}
+          STORAGE_CONNECTION_STRING=secretref:storage-connection-string
+          BM_HEADLESS=true
+          BM_ARTIFACTS_ROOT=/tmp/artifacts
+          IN_DOCKER=true
+          BM_VIEWPORT_W=1440
+          BM_VIEWPORT_H=900
+        targetPort: 8000
+        ingress: internal
+    
+    - name: Get Backend FQDN
+      id: backend-fqdn
+      run: |
+        BACKEND_URL=$(az containerapp show \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn -o tsv)
+        echo "url=https://$BACKEND_URL" >> $GITHUB_OUTPUT
+    
+    - name: Deploy Frontend to Container Apps
+      uses: azure/container-apps-deploy-action@v1
+      with:
+        resourceGroup: ${{ env.RESOURCE_GROUP }}
+        containerAppName: ${{ env.FRONTEND_APP_NAME }}
+        containerAppEnvironment: ${{ env.ACA_ENV }}
+        imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ github.sha }}
+        environmentVariables: |
+          BACKEND_URL=${{ steps.backend-fqdn.outputs.url }}
+          NODE_ENV=production
+        targetPort: 3000
+        ingress: external
+    
+    - name: Output Deployment URLs
+      run: |
+        FRONTEND_URL=$(az containerapp show \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --query properties.configuration.ingress.fqdn -o tsv)
+        echo "::notice::Frontend URL: https://$FRONTEND_URL"
+        echo "::notice::Backend URL: ${{ steps.backend-fqdn.outputs.url }}"
+

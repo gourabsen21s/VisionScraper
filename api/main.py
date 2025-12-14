@@ -1,4 +1,12 @@
 # api/main.py
+import sys
+import asyncio
+
+# Fix for Windows: Use SelectorEventLoop instead of ProactorEventLoop
+# This is required for Playwright subprocess creation to work
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .deps import init_services
@@ -11,7 +19,14 @@ app = FastAPI(title="Browser Runner API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        # Azure Container Apps frontend (will be updated after deployment)
+        "https://*.azurecontainerapps.io",
+        # Add your custom domain here after configuration
+        # "https://yourdomain.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

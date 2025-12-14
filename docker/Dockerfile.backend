@@ -1,0 +1,54 @@
+# Backend Dockerfile for VisionScraper
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install system dependencies for Playwright, YOLO, and OCR
+RUN apt-get update && apt-get install -y \
+    # Playwright dependencies
+    curl gnupg ca-certificates \
+    libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libxss1 libasound2 libx11-xcb1 libgbm1 libgtk-3-0 \
+    libxcomposite1 libxdamage1 libxrandr2 libpango-1.0-0 \
+    libcairo2 libasound2 libatspi2.0-0 libxshmfence1 \
+    # OpenCV dependencies (libgl1 for newer Debian)
+    libgl1 libglib2.0-0 \
+    # Tesseract OCR
+    tesseract-ocr libtesseract-dev \
+    # Build tools
+    gcc g++ make \
+    # Clean up
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy dependency files
+COPY requirements.txt pyproject.toml ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browsers
+RUN playwright install chromium
+RUN playwright install-deps chromium
+
+# Copy application code
+COPY api ./api
+COPY runner ./runner
+COPY reasoner ./reasoner
+COPY models ./models
+COPY utils ./utils
+COPY main.py ./
+
+# Environment variables
+ENV BM_HEADLESS=true
+ENV BM_VIEWPORT_W=1440
+ENV BM_VIEWPORT_H=900
+ENV PYTHONUNBUFFERED=1
+ENV BM_ARTIFACTS_ROOT=/tmp/artifacts
+
+# Create artifacts directory
+RUN mkdir -p /tmp/artifacts
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+

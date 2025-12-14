@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { StepResult } from '@/components/ReasoningPanel';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+// Use the proxy route for backend API calls - this uses runtime environment variables
+const API_BASE = '/api/proxy';
 
 interface SessionInfo {
   session_id: string;
@@ -30,7 +31,7 @@ export function useAgentSession() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/sessions`, {
+      const res = await fetch(`${API_BASE}/sessions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ video: true, keep_artifacts: true })
@@ -51,7 +52,7 @@ export function useAgentSession() {
   const closeSession = useCallback(async () => {
     if (!sessionId) return;
     try {
-      await fetch(`${API_BASE}/api/sessions/${sessionId}?keep_artifacts=true`, {
+      await fetch(`${API_BASE}/sessions/${sessionId}?keep_artifacts=true`, {
         method: 'DELETE'
       });
     } catch (e) {
@@ -78,7 +79,7 @@ export function useAgentSession() {
         if (!sid) throw new Error('Failed to create session');
       }
 
-      const res = await fetch(`${API_BASE}/api/sessions/${sid}/plan_execute_loop`, {
+      const res = await fetch(`${API_BASE}/sessions/${sid}/plan_execute_loop`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +119,7 @@ export function useAgentSession() {
         if (!sid) throw new Error('Failed to create session');
       }
 
-      const res = await fetch(`${API_BASE}/api/sessions/${sid}/plan_execute`, {
+      const res = await fetch(`${API_BASE}/sessions/${sid}/plan_execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
