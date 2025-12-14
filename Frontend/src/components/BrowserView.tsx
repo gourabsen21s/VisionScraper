@@ -15,7 +15,7 @@ type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export default function BrowserView({
   sessionId,
-  backendUrl = 'ws://localhost:8000',
+  backendUrl = 'https://visionscraper-backend.internal.whitepebble-a73ac1ee.southindia.azurecontainerapps.io',
   className,
   onError
 }: BrowserViewProps) {
